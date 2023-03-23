@@ -13,7 +13,3 @@ jobs:
     uses: ./.github/workflows/reusable_release.yml
     permissions:
       contents: write
-    with:
-      after-install-command: |
-        yarn lint
-        yarn typecheck
