@@ -10,5 +10,8 @@
   "devDependencies": {
     "@release-it/conventional-changelog": "^5.1.1",
     "release-it": "^15.9.1"
+  },
+  "volta": {
+    "node": "18.15.0"
   }
 }
