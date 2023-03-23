@@ -72,7 +72,7 @@ jobs:
         if: inputs.check-if-should-release == true
         id: should-release
         run: |
-          if yarn should-release-it; then
+          if npx should-release-it; then
             echo "value=true" >> $GITHUB_OUTPUT
           else
             echo "value=false" >> $GITHUB_OUTPUT
