@@ -1,0 +1,110 @@
+name: Generate Release Reusable Workflow
+
+run-name: Generate Release Reusable Workflow
+
+on:
+  workflow_call:
+    inputs:
+      after-install-command:
+        type: string
+      after-release-command:
+        type: string
+      check-if-should-release:
+        type: boolean
+        default: true
+      backmerge:
+        type: boolean
+        default: true
+    secrets:
+      gpg-private-key:
+      gpg-passphrase:
+      checkout-token:
+      npm-token:
+      release-token:
+
+jobs:
+  release:
+    name: Generate Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Increase watchers to fix Docker
+        run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
+
+      - name: Checkout the repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.checkout-token || github.token }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: package.json
+          cache: yarn
+
+      - name: Install dependencies
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 5
+          max_attempts: 2
+          retry_on: error
+          command: yarn install --prefer-offline --frozen-lockfile --silent
+
+      - name: Run after install command
+        if: inputs.after-install-command
+        run: ${{ inputs.after-install-command }}
+
+      - name: Import GPG key
+        if: env.GPG_PRIVATE_KEY && env.GPG_PASSPHRASE
+        uses: crazy-max/ghaction-import-gpg@v5
+        with:
+          gpg_private_key: ${{ env.GPG_PRIVATE_KEY }}
+          passphrase: ${{ env.GPG_PASSPHRASE }}
+          git_user_signingkey: true
+          git_commit_gpgsign: true
+          git_tag_gpgsign: true
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.gpg-private-key }}
+          GPG_PASSPHRASE: ${{ secrets.gpg-passphrase }}
+
+      - name: Check if should release
+        if: inputs.check-if-should-release == true
+        id: should-release
+        run: |
+          if yarn should-release-it; then
+            echo "value=true" >> $GITHUB_OUTPUT
+          else
+            echo "value=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Add npm token
+        if: steps.should-release.outputs.value == 'true' && env.NPM_TOKEN
+        run: npm config set //registry.npmjs.org/:_authToken $NPM_TOKEN
+        env:
+          NPM_TOKEN: ${{ secrets.npm-token }}
+
+      - name: Release version on main
+        if: steps.should-release.outputs.value == 'true' && github.ref_name == 'main'
+        run: npm run release-it -- -VV --ci
+        env:
+          GITHUB_TOKEN: ${{ secrets.release-token || github.token }}
+
+      - name: Release version on beta
+        if: steps.should-release.outputs.value == 'true' && github.ref_name == 'beta'
+        run: npm run release-it -- -VV --ci --preRelease=beta
+        env:
+          GITHUB_TOKEN: ${{ secrets.release-token || github.token }}
+
+      - name: Run after release command
+        if: inputs.after-release-command
+        run: ${{ inputs.after-release-command }}
+
+      - name: Perform backmerge from main into beta
+        if: github.ref_name == 'main' && inputs.backmerge == true
+        run: |
+          git checkout -B main
+          git checkout -B beta
+          git rebase origin/main
+          [[ `git status -s -uno` ]] && git commit -m "chore(release): merge main into beta [skip ci]"
+          git push --no-verify origin HEAD:beta

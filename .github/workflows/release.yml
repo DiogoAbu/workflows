@@ -1,0 +1,19 @@
+name: Generate Release
+
+on:
+  push:
+    branches:
+      - main
+      - beta
+
+jobs:
+  release:
+    name: Generate Release
+    if: contains(github.event.head_commit.message, '[skip ci]') == false
+    uses: ./.github/workflows/reusable_release.yml
+    permissions:
+      contents: write
+    with:
+      after-install-command: |
+        yarn lint
+        yarn typecheck
