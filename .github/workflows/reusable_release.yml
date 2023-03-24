@@ -109,8 +109,8 @@ jobs:
 
       - name: Release it
         id: release-it
-        if: steps.should-release.outputs.value == 'true'
         uses: mathiasvr/command-output@v2.0.0
+        if: steps.should-release.outputs.value == 'true'
         with:
           run: npx release-it ${{ inputs.release-it-args }} -VV --ci ${{ (github.ref_name == 'beta' && '--preRelease=beta') || '' }}
         env:
