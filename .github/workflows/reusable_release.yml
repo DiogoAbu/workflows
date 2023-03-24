@@ -116,8 +116,8 @@ jobs:
           run: npx release-it ${{ inputs.release-it-args }} -VV --ci ${{ (github.ref_name == 'beta' && '--preRelease=beta') || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.release-token || github.token }}
-          GIT_COMMITTER_NAME: ${{ steps.import-gpg.outputs.name }}
-          GIT_COMMITTER_EMAIL: ${{ steps.import-gpg.outputs.email }}
+          GIT_COMMITTER_NAME: ${{ steps.import-gpg.outputs.name || env.GIT_AUTHOR_NAME }}
+          GIT_COMMITTER_EMAIL: ${{ steps.import-gpg.outputs.email || env.GIT_AUTHOR_EMAIL }}
 
       - name: Release it output
         if: steps.should-release.outputs.value == 'true'
@@ -136,5 +136,5 @@ jobs:
           [[ `git status -s -uno` ]] && git commit -m "chore(release): merge main into beta [skip ci]"
           git push --no-verify origin HEAD:beta
         env:
-          GIT_COMMITTER_NAME: ${{ steps.import-gpg.outputs.name }}
-          GIT_COMMITTER_EMAIL: ${{ steps.import-gpg.outputs.email }}
+          GIT_COMMITTER_NAME: ${{ steps.import-gpg.outputs.name || env.GIT_AUTHOR_NAME }}
+          GIT_COMMITTER_EMAIL: ${{ steps.import-gpg.outputs.email || env.GIT_AUTHOR_EMAIL }}
