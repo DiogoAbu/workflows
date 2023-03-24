@@ -1,12 +1,11 @@
-name: Release It Reusable Workflow
+name: Release it reusable workflow
 
 on:
   workflow_call:
     inputs:
-      release-it-options:
+      release-it-args:
         type: string
-        default: "{}"
-        description: "Config for release-it as a JSON string"
+        description: "Arguments for release-it"
       after-install-command:
         type: string
       after-release-command:
@@ -41,7 +40,7 @@ env:
 
 jobs:
   release-it:
-    name: Release It
+    name: Release it
     runs-on: ubuntu-latest
 
     outputs:
@@ -112,22 +111,9 @@ jobs:
       - name: Release it
         id: release-it
         if: steps.should-release.outputs.value == 'true'
-        uses: actions/github-script@v6
+        uses: mathiasvr/command-output@v2.0.0
         with:
-          result-encoding: json
-          script: |
-            import { default: releaseIt } = await import('${{ github.workspace }}/node_modules/release-it/lib/index.js');
-            const userOptions = ${{ inputs.release-it-options }};
-            const result = await releaseIt({
-              ci: true,
-              verbose: 2,
-              ...userOptions,
-              preRelease: github.ref_name === 'beta' ? 'beta' : undefined,
-            });
-            core.setOutput('name', result.name);
-            core.setOutput('changelog', result.changelog);
-            core.setOutput('latest-version', result.latestVersion);
-            core.setOutput('version', result.version);
+          run: npx release-it ${{ inputs.release-it-args }} -VV --ci ${{ (github.ref_name == 'beta' && '--preRelease=beta') || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.release-token || github.token }}
           GIT_COMMITTER_NAME: ${{ steps.import-gpg.outputs.name }}
@@ -135,7 +121,7 @@ jobs:
 
       - name: Release it output
         if: steps.should-release.outputs.value == 'true'
-        run: echo "${{ fromJson(steps.release-it.outputs) }}"
+        run: echo "${{ steps.release-it.outputs.stdout }}"
 
       - name: Run after release command
         if: inputs.after-release-command
