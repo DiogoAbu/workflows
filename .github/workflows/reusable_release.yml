@@ -116,7 +116,7 @@ jobs:
         with:
           result-encoding: json
           script: |
-            const { default: releaseIt } = await import('release-it');
+            import releaseIt from 'release-it';
             const userOptions = ${{ inputs.release-it-options }};
             const result = await releaseIt({
               ci: true,
