@@ -25,18 +25,14 @@ on:
     outputs:
       should-release:
         value: ${{ jobs.release-it.outputs.should-release }}
-      name:
-        value: ${{ jobs.release-it.outputs.name }}
-      changelog:
-        value: ${{ jobs.release-it.outputs.changelog }}
-      latest-version:
-        value: ${{ jobs.release-it.outputs.latest-version }}
+      prev-version:
+        value: ${{ jobs.release-it.outputs.prev-version }}
       version:
         value: ${{ jobs.release-it.outputs.version }}
 
 env:
-  GIT_AUTHOR_NAME: 41898282+github-actions[bot]@users.noreply.github.com
-  GIT_AUTHOR_EMAIL: github-actions[bot]
+  GIT_AUTHOR_NAME: github-actions[bot]
+  GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
 
 jobs:
   release-it:
@@ -45,10 +41,8 @@ jobs:
 
     outputs:
       should-release: ${{ steps.should-release.outputs.value }}
-      name: ${{ steps.release-it.outputs.name }}
-      changelog: ${{ steps.release-it.outputs.changelog }}
-      latest-version: ${{ steps.release-it.outputs.latest-version }}
-      version: ${{ steps.release-it.outputs.version }}
+      prev-version: ${{ steps.prev-version.outputs.value }}
+      version: ${{ steps.next-version.outputs.value }}
 
     steps:
       - name: Increase watchers to fix Docker
@@ -73,6 +67,10 @@ jobs:
           max_attempts: 2
           retry_on: error
           command: yarn install --prefer-offline --frozen-lockfile --silent
+
+      - name: Get previous version
+        id: prev-version
+        run: echo value=$(node -p "'v'+require('./package.json').version") >> $GITHUB_OUTPUT
 
       - name: Run after install command
         if: inputs.after-install-command
@@ -120,9 +118,9 @@ jobs:
           GIT_COMMITTER_NAME: ${{ steps.import-gpg.outputs.name || env.GIT_AUTHOR_NAME }}
           GIT_COMMITTER_EMAIL: ${{ steps.import-gpg.outputs.email || env.GIT_AUTHOR_EMAIL }}
 
-      - name: Release it output
-        if: steps.should-release.outputs.value == 'true'
-        run: echo "${{ steps.release-it.outputs.stdout }}"
+      - name: Get next version
+        id: next-version
+        run: echo value=$(node -p "'v'+require('./package.json').version") >> $GITHUB_OUTPUT
 
       - name: Run after release command
         if: inputs.after-release-command
