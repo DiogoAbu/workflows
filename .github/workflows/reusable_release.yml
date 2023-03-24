@@ -1,10 +1,12 @@
-name: Generate Release Reusable Workflow
-
-run-name: Generate Release Reusable Workflow
+name: Release It Reusable Workflow
 
 on:
   workflow_call:
     inputs:
+      release-it-options:
+        type: string
+        default: "{}"
+        description: "Config for release-it as a JSON string"
       after-install-command:
         type: string
       after-release-command:
@@ -21,11 +23,33 @@ on:
       checkout-token:
       npm-token:
       release-token:
+    outputs:
+      should-release:
+        value: ${{ jobs.release-it.outputs.should-release }}
+      name:
+        value: ${{ jobs.release-it.outputs.name }}
+      changelog:
+        value: ${{ jobs.release-it.outputs.changelog }}
+      latest-version:
+        value: ${{ jobs.release-it.outputs.latest-version }}
+      version:
+        value: ${{ jobs.release-it.outputs.version }}
+
+env:
+  GIT_AUTHOR_NAME: 41898282+github-actions[bot]@users.noreply.github.com
+  GIT_AUTHOR_EMAIL: github-actions[bot]
 
 jobs:
-  release:
-    name: Generate Release
+  release-it:
+    name: Release It
     runs-on: ubuntu-latest
+
+    outputs:
+      should-release: ${{ steps.should-release.outputs.value }}
+      name: ${{ steps.release-it.outputs.name }}
+      changelog: ${{ steps.release-it.outputs.changelog }}
+      latest-version: ${{ steps.release-it.outputs.latest-version }}
+      version: ${{ steps.release-it.outputs.version }}
 
     steps:
       - name: Increase watchers to fix Docker
@@ -56,6 +80,7 @@ jobs:
         run: ${{ inputs.after-install-command }}
 
       - name: Import GPG key
+        id: import-gpg
         if: env.GPG_PRIVATE_KEY && env.GPG_PASSPHRASE
         uses: crazy-max/ghaction-import-gpg@v5
         with:
@@ -69,8 +94,8 @@ jobs:
           GPG_PASSPHRASE: ${{ secrets.gpg-passphrase }}
 
       - name: Check if should release
-        if: inputs.check-if-should-release == true
         id: should-release
+        if: inputs.check-if-should-release
         run: |
           if npx should-release-it; then
             echo "value=true" >> $GITHUB_OUTPUT
@@ -84,27 +109,42 @@ jobs:
         env:
           NPM_TOKEN: ${{ secrets.npm-token }}
 
-      - name: Release version on main
-        if: steps.should-release.outputs.value == 'true' && github.ref_name == 'main'
-        run: npm run release-it -- -VV --ci
+      - name: Release It
+        id: release-it
+        if: steps.should-release.outputs.value == 'true'
+        uses: actions/github-script@v6
+        with:
+          result-encoding: json
+          script: |
+            const releaseIt = require('release-it');
+            const userOptions = ${{ inputs.release-it-options }};
+            const result = await releaseIt({
+              ci: true,
+              verbose: 2,
+              ...userOptions,
+              preRelease: github.ref_name === 'beta' ? 'beta' : undefined,
+            });
+            core.setOutput('name', result.name);
+            core.setOutput('changelog', result.changelog);
+            core.setOutput('latest-version', result.latestVersion);
+            core.setOutput('version', result.version);
         env:
           GITHUB_TOKEN: ${{ secrets.release-token || github.token }}
-
-      - name: Release version on beta
-        if: steps.should-release.outputs.value == 'true' && github.ref_name == 'beta'
-        run: npm run release-it -- -VV --ci --preRelease=beta
-        env:
-          GITHUB_TOKEN: ${{ secrets.release-token || github.token }}
+          GIT_COMMITTER_NAME: ${{ steps.import-gpg.outputs.name }}
+          GIT_COMMITTER_EMAIL: ${{ steps.import-gpg.outputs.email }}
 
       - name: Run after release command
         if: inputs.after-release-command
         run: ${{ inputs.after-release-command }}
 
       - name: Perform backmerge from main into beta
-        if: github.ref_name == 'main' && inputs.backmerge == true
+        if: github.ref_name == 'main' && inputs.backmerge
         run: |
           git checkout -B main
           git checkout -B beta
           git rebase origin/main
           [[ `git status -s -uno` ]] && git commit -m "chore(release): merge main into beta [skip ci]"
           git push --no-verify origin HEAD:beta
+        env:
+          GIT_COMMITTER_NAME: ${{ steps.import-gpg.outputs.name }}
+          GIT_COMMITTER_EMAIL: ${{ steps.import-gpg.outputs.email }}

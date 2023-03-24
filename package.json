@@ -4,9 +4,6 @@
   "repository": "git@github.com:DiogoAbu/workflows.git",
   "author": "Diogo de Azevedo Silva <diogodeazevedosilva@gmail.com>",
   "license": "MIT",
-  "scripts": {
-    "release-it": "release-it"
-  },
   "devDependencies": {
     "@release-it/conventional-changelog": "^5.1.1",
     "release-it": "^15.9.1"
