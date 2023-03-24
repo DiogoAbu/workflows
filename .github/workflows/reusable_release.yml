@@ -116,7 +116,7 @@ jobs:
         with:
           result-encoding: json
           script: |
-            import releaseIt from 'release-it';
+            import { default: releaseIt } = await import('${{ github.workspace }}/node_modules/release-it/lib/index.js');
             const userOptions = ${{ inputs.release-it-options }};
             const result = await releaseIt({
               ci: true,
