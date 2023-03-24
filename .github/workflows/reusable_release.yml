@@ -109,14 +109,14 @@ jobs:
         env:
           NPM_TOKEN: ${{ secrets.npm-token }}
 
-      - name: Release It
+      - name: Release it
         id: release-it
         if: steps.should-release.outputs.value == 'true'
         uses: actions/github-script@v6
         with:
           result-encoding: json
           script: |
-            const releaseIt = require('release-it');
+            const releaseIt = import('release-it');
             const userOptions = ${{ inputs.release-it-options }};
             const result = await releaseIt({
               ci: true,
@@ -132,6 +132,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.release-token || github.token }}
           GIT_COMMITTER_NAME: ${{ steps.import-gpg.outputs.name }}
           GIT_COMMITTER_EMAIL: ${{ steps.import-gpg.outputs.email }}
+
+      - name: Release it output
+        if: steps.should-release.outputs.value == 'true'
+        run: echo "${{ fromJson(steps.release-it.outputs) }}"
 
       - name: Run after release command
         if: inputs.after-release-command
