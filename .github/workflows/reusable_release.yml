@@ -8,8 +8,6 @@ on:
         description: "Arguments for release-it"
       after-install-command:
         type: string
-      after-release-command:
-        type: string
       check-if-should-release:
         type: boolean
         default: true
@@ -120,11 +118,8 @@ jobs:
 
       - name: Get next version
         id: next-version
+        if: steps.should-release.outputs.value == 'true'
         run: echo value=$(node -p "'v'+require('./package.json').version") >> $GITHUB_OUTPUT
-
-      - name: Run after release command
-        if: inputs.after-release-command
-        run: ${{ inputs.after-release-command }}
 
       - name: Perform backmerge from main into beta
         if: github.ref_name == 'main' && inputs.backmerge
