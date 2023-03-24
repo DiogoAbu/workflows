@@ -29,7 +29,6 @@ on:
 jobs:
   release:
     name: Release
-    if: contains(github.event.head_commit.message, '[skip ci]') == false
     uses: DiogoAbu/workflows/.github/workflows/reusable_release.yml@main
     permissions:
       contents: write
