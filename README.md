@@ -33,22 +33,26 @@ jobs:
     permissions:
       contents: write
     with:
-      after-install-command: |
+      after_install_command: |
         yarn lint
         yarn typecheck
-    secrets: 
-      release-token: ${{ secrets.PERSONAL_TOKEN }}
-      gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
-      gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
+    secrets:
+      gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+      gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
   deploy:
     name: Deploy
-    runs-on: ubuntu-latest
-    needs: release
-    if: needs.release.outputs.should-release == 'true'
-    steps:
-      - run: |
-          echo "should-release: ${{ fromJson(needs.release.outputs.should-release) }}"
-          echo "prev-version: ${{ needs.release.outputs.prev-version }}"
-          echo "version: ${{ needs.release.outputs.version }}"
+    uses: DiogoAbu/workflows/.github/workflows/reusable_beanstalk.yml@main
+    with:
+      files_to_zip: dist package.json
+      should_deploy_prod: true
+      should_deploy_staging: true
+    secrets:
+      access_key_id: ${{ secrets.AWS_DEPLOY_ACCESS_KEY_ID }}
+      secret_access_key: ${{ secrets.AWS_DEPLOY_SECRET_ACCESS_KEY }}
+      region: ${{ secrets.AWS_DEPLOY_REGION }}
+      existing_bucket_name: ${{ secrets.AWS_DEPLOY_EXISTING_BUCKET_NAME }}
+      application_name: ${{ secrets.AWS_DEPLOY_APPLICATION_NAME }}
+      environment_name_prod: ${{ secrets.AWS_DEPLOY_ENVIRONMENT_NAME_PROD }}
+      environment_name_staging: ${{ secrets.AWS_DEPLOY_ENVIRONMENT_NAME_STAGING }}
 ```

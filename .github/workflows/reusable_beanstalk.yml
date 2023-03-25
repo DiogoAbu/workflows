@@ -1,0 +1,110 @@
+name: Beanstalk deploy reusable workflow
+
+on:
+  workflow_call:
+    inputs:
+      files_to_zip:
+        type: string
+        description: "List of files to zip"
+        required: true
+      after_install_command:
+        type: string
+      should_deploy_prod:
+        type: boolean
+        default: true
+      should_deploy_staging:
+        type: boolean
+        default: true
+      use_existing_version_if_available:
+        type: boolean
+        default: true
+      wait_for_deployment:
+        type: boolean
+        default: false
+    secrets:
+      checkout_token:
+      access_key_id:
+        required: true
+      secret_access_key:
+        required: true
+      region:
+        required: true
+      existing_bucket_name:
+        required: true
+      application_name:
+        required: true
+      environment_name_prod:
+        required: true
+      environment_name_staging:
+        required: true
+
+jobs:
+  beanstalk_deploy:
+    name: Beanstalk deploy
+    runs-on: ubuntu-latest
+    if: inputs.should_deploy_prod || inputs.should_deploy_staging
+
+    steps:
+      - name: Increase watchers to fix Docker
+        run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
+
+      - name: Checkout the repo
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+          token: ${{ secrets.checkout_token || github.token }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: package.json
+          cache: yarn
+
+      - name: Install dependencies
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 5
+          max_attempts: 2
+          retry_on: error
+          command: yarn install --prefer-offline --frozen-lockfile --silent
+
+      - name: Get version
+        id: version
+        run: echo value=$(node -p "'v'+require('./package.json').version") >> $GITHUB_OUTPUT
+
+      - name: Check if version is prerelease
+        id: is_prerelease
+        run: echo value=$(node -p "!!require('semver/functions/prerelease')('${{ steps.version.outputs.value }}')") >> $GITHUB_OUTPUT
+
+      - name: Display version and prerelease
+        run: |
+          echo "Version: ${{ steps.version.outputs.value }}"
+          echo "Is Prerelease: ${{ fromJSON(steps.is_prerelease.outputs.value) }}"
+
+      - name: Run after install command
+        if: inputs.after_install_command
+        run: ${{ inputs.after_install_command }}
+
+      - name: Prepare deploy
+        run: |
+          npx aws-multi-env prepare --env "$AWS_DEPLOY_ENVIRONMENT_NAME"
+          yarn build
+          zip -r "$RUNNER_TEMP/deploy.zip" ${{ inputs.files_to_zip }}
+          npx aws-multi-env revert --env "$AWS_DEPLOY_ENVIRONMENT_NAME"
+        env:
+          AWS_DEPLOY_ENVIRONMENT_NAME: ${{ (steps.is_prerelease.outputs.value == 'true' && secrets.environment_name_staging) || secrets.environment_name_prod }}
+
+      - name: Beanstalk deploy
+        uses: einaregilsson/beanstalk-deploy@v21
+        with:
+          deployment_package: ${{ runner.temp }}/deploy.zip
+          environment_name: ${{ (steps.is_prerelease.outputs.value == 'true' && secrets.environment_name_staging) || secrets.environment_name_prod }}
+          application_name: ${{ secrets.application_name }}
+          aws_access_key: ${{ secrets.access_key_id }}
+          aws_secret_key: ${{ secrets.secret_access_key }}
+          existing_bucket_name: ${{ secrets.existing_bucket_name }}
+          region: ${{ secrets.region }}
+          version_description: ${{ github.SHA }}
+          version_label: ${{ steps.version.outputs.value }}
+          use_existing_version_if_available: ${{ inputs.use_existing_version_if_available }}
+          wait_for_deployment: ${{ inputs.wait_for_deployment }}
