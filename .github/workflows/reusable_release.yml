@@ -3,44 +3,44 @@ name: Release it reusable workflow
 on:
   workflow_call:
     inputs:
-      release-it-args:
+      release_it_args:
         type: string
         description: "Arguments for release-it"
-      after-install-command:
+      after_install_command:
         type: string
-      check-if-should-release:
+      check_if_should_release:
         type: boolean
         default: true
       backmerge:
         type: boolean
         default: true
     secrets:
-      gpg-private-key:
-      gpg-passphrase:
-      checkout-token:
-      npm-token:
-      release-token:
+      gpg_private_key:
+      gpg_passphrase:
+      checkout_token:
+      npm_token:
+      release_token:
     outputs:
-      should-release:
-        value: ${{ jobs.release-it.outputs.should-release }}
-      prev-version:
-        value: ${{ jobs.release-it.outputs.prev-version }}
+      should_release:
+        value: ${{ jobs.release_it.outputs.should_release }}
+      prev_version:
+        value: ${{ jobs.release_it.outputs.prev_version }}
       version:
-        value: ${{ jobs.release-it.outputs.version }}
+        value: ${{ jobs.release_it.outputs.version }}
 
 env:
   GIT_AUTHOR_NAME: github-actions[bot]
   GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
 
 jobs:
-  release-it:
+  release_it:
     name: Release it
     runs-on: ubuntu-latest
 
     outputs:
-      should-release: ${{ steps.should-release.outputs.value }}
-      prev-version: ${{ steps.prev-version.outputs.value }}
-      version: ${{ steps.next-version.outputs.value }}
+      should_release: ${{ steps.should_release.outputs.value }}
+      prev_version: ${{ steps.prev_version.outputs.value }}
+      version: ${{ steps.version.outputs.value }}
 
     steps:
       - name: Increase watchers to fix Docker
@@ -50,7 +50,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          token: ${{ secrets.checkout-token || github.token }}
+          token: ${{ secrets.checkout_token || github.token }}
 
       - name: Set up Node
         uses: actions/setup-node@v3
@@ -67,15 +67,15 @@ jobs:
           command: yarn install --prefer-offline --frozen-lockfile --silent
 
       - name: Get previous version
-        id: prev-version
+        id: prev_version
         run: echo value=$(node -p "'v'+require('./package.json').version") >> $GITHUB_OUTPUT
 
       - name: Run after install command
-        if: inputs.after-install-command
-        run: ${{ inputs.after-install-command }}
+        if: inputs.after_install_command
+        run: ${{ inputs.after_install_command }}
 
       - name: Import GPG key
-        id: import-gpg
+        id: import_gpg
         if: env.GPG_PRIVATE_KEY && env.GPG_PASSPHRASE
         uses: crazy-max/ghaction-import-gpg@v5
         with:
@@ -86,12 +86,12 @@ jobs:
           git_tag_gpgsign: true
           git_push_gpgsign: false
         env:
-          GPG_PRIVATE_KEY: ${{ secrets.gpg-private-key }}
-          GPG_PASSPHRASE: ${{ secrets.gpg-passphrase }}
+          GPG_PRIVATE_KEY: ${{ secrets.gpg_private_key }}
+          GPG_PASSPHRASE: ${{ secrets.gpg_passphrase }}
 
       - name: Check if should release
-        id: should-release
-        if: inputs.check-if-should-release
+        id: should_release
+        if: inputs.check_if_should_release
         run: |
           if npx should-release-it; then
             echo "value=true" >> $GITHUB_OUTPUT
@@ -100,25 +100,25 @@ jobs:
           fi
 
       - name: Add npm token
-        if: steps.should-release.outputs.value == 'true' && env.NPM_TOKEN
+        if: steps.should_release.outputs.value == 'true' && env.NPM_TOKEN
         run: npm config set //registry.npmjs.org/:_authToken $NPM_TOKEN
         env:
-          NPM_TOKEN: ${{ secrets.npm-token }}
+          NPM_TOKEN: ${{ secrets.npm_token }}
 
       - name: Release it
-        id: release-it
+        id: release_it
         uses: mathiasvr/command-output@v2.0.0
-        if: steps.should-release.outputs.value == 'true'
+        if: steps.should_release.outputs.value == 'true'
         with:
-          run: npx release-it ${{ inputs.release-it-args }} -VV --ci ${{ (github.ref_name == 'beta' && '--preRelease=beta') || '' }}
+          run: npx release-it ${{ inputs.release_it_args }} -VV --ci ${{ (github.ref_name == 'beta' && '--preRelease=beta') || '' }}
         env:
-          GITHUB_TOKEN: ${{ secrets.release-token || github.token }}
-          GIT_COMMITTER_NAME: ${{ steps.import-gpg.outputs.name || env.GIT_AUTHOR_NAME }}
-          GIT_COMMITTER_EMAIL: ${{ steps.import-gpg.outputs.email || env.GIT_AUTHOR_EMAIL }}
+          GITHUB_TOKEN: ${{ secrets.release_token || github.token }}
+          GIT_COMMITTER_NAME: ${{ steps.import_gpg.outputs.name || env.GIT_AUTHOR_NAME }}
+          GIT_COMMITTER_EMAIL: ${{ steps.import_gpg.outputs.email || env.GIT_AUTHOR_EMAIL }}
 
-      - name: Get next version
-        id: next-version
-        if: steps.should-release.outputs.value == 'true'
+      - name: Get version
+        id: version
+        if: steps.should_release.outputs.value == 'true'
         run: echo value=$(node -p "'v'+require('./package.json').version") >> $GITHUB_OUTPUT
 
       - name: Perform backmerge from main into beta
@@ -130,5 +130,5 @@ jobs:
           [[ `git status -s -uno` ]] && git commit -m "chore(release): merge main into beta [skip ci]"
           git push --no-verify origin HEAD:beta
         env:
-          GIT_COMMITTER_NAME: ${{ steps.import-gpg.outputs.name || env.GIT_AUTHOR_NAME }}
-          GIT_COMMITTER_EMAIL: ${{ steps.import-gpg.outputs.email || env.GIT_AUTHOR_EMAIL }}
+          GIT_COMMITTER_NAME: ${{ steps.import_gpg.outputs.name || env.GIT_AUTHOR_NAME }}
+          GIT_COMMITTER_EMAIL: ${{ steps.import_gpg.outputs.email || env.GIT_AUTHOR_EMAIL }}
