@@ -82,10 +82,11 @@ jobs:
           echo "Is Prerelease: ${{ fromJSON(steps.is_prerelease.outputs.value) }}"
 
       - name: Run after install command
-        if: inputs.after_install_command
+        if: inputs.after_install_command && ((steps.is_prerelease.outputs.value == 'true' && inputs.should_deploy_staging) || inputs.should_deploy_prod)
         run: ${{ inputs.after_install_command }}
 
       - name: Prepare deploy
+        if: (steps.is_prerelease.outputs.value == 'true' && inputs.should_deploy_staging) || inputs.should_deploy_prod
         run: |
           npx aws-multi-env prepare --env "$AWS_DEPLOY_ENVIRONMENT_NAME"
           yarn build
@@ -96,6 +97,7 @@ jobs:
 
       - name: Beanstalk deploy
         uses: einaregilsson/beanstalk-deploy@v21
+        if: (steps.is_prerelease.outputs.value == 'true' && inputs.should_deploy_staging) || inputs.should_deploy_prod
         with:
           deployment_package: ${{ runner.temp }}/deploy.zip
           environment_name: ${{ (steps.is_prerelease.outputs.value == 'true' && secrets.environment_name_staging) || secrets.environment_name_prod }}
