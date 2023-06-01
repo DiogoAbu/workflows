@@ -21,6 +21,8 @@ on:
       wait_for_deployment:
         type: boolean
         default: false
+      checkout_ref:
+        type: string
     secrets:
       checkout_token:
       access_key_id:
@@ -53,6 +55,7 @@ jobs:
         with:
           persist-credentials: false
           token: ${{ secrets.checkout_token || github.token }}
+          ref: ${{ inputs.checkout_ref }}
 
       - name: Set up Node
         uses: actions/setup-node@v3
