@@ -3,9 +3,13 @@ name: Release it reusable workflow
 on:
   workflow_call:
     inputs:
+      release_it_command:
+        type: string
+        description: "Replace command for release-it"
+        default: "npx release-it"
       release_it_args:
         type: string
-        description: "Arguments for release-it"
+        description: "Extra arguments for release-it"
       after_install_command:
         type: string
       check_if_should_release:
@@ -110,7 +114,7 @@ jobs:
         uses: mathiasvr/command-output@v2.0.0
         if: steps.should_release.outputs.value == 'true'
         with:
-          run: npx release-it ${{ inputs.release_it_args }} -VV --ci ${{ (github.ref_name == 'beta' && '--preRelease=beta') || '' }}
+          run: ${{ inputs.release_it_command }} ${{ inputs.release_it_args }} -VV --ci ${{ (github.ref_name == 'beta' && '--preRelease=beta') || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.release_token || github.token }}
           GIT_COMMITTER_NAME: ${{ steps.import_gpg.outputs.name || env.GIT_AUTHOR_NAME }}
