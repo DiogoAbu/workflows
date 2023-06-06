@@ -75,12 +75,12 @@ jobs:
         id: prev_version
         run: echo value=$(node -p "'v'+require('./package.json').version") >> $GITHUB_OUTPUT
 
+      - name: Run after install command (secrets)
+        run: ${{ secrets.after_install_command }}
+
       - name: Run after install command (inputs)
         if: inputs.after_install_command
         run: ${{ inputs.after_install_command }}
-
-      - name: Run after install command (secrets)
-        run: ${{ secrets.after_install_command }}
 
       - name: Import GPG key
         id: import_gpg
