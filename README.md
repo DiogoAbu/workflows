@@ -43,10 +43,12 @@ jobs:
   deploy:
     name: Deploy
     uses: DiogoAbu/workflows/.github/workflows/reusable_beanstalk.yml@main
+    needs: release
     with:
       files_to_zip: dist package.json
       should_deploy_prod: true
       should_deploy_staging: true
+      checkout_ref: ${{ needs.release.outputs.version }}
     secrets:
       access_key_id: ${{ secrets.AWS_DEPLOY_ACCESS_KEY_ID }}
       secret_access_key: ${{ secrets.AWS_DEPLOY_SECRET_ACCESS_KEY }}
