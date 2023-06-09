@@ -108,17 +108,14 @@ jobs:
           fi
 
       - name: Add npm token
-        if: steps.should_release.outputs.value == 'true' && env.NPM_TOKEN
+        if: (!inputs.check_if_should_release || steps.should_release.outputs.value == 'true') && env.NPM_TOKEN
         run: npm config set //registry.npmjs.org/:_authToken $NPM_TOKEN
         env:
           NPM_TOKEN: ${{ secrets.npm_token }}
 
       - name: Release it
-        id: release_it
-        uses: mathiasvr/command-output@v2.0.0
-        if: steps.should_release.outputs.value == 'true'
-        with:
-          run: ${{ inputs.release_it_command }} ${{ inputs.release_it_args }} -VV --ci ${{ (github.ref_name == 'beta' && '--preRelease=beta') || '' }}
+        if: (!inputs.check_if_should_release || steps.should_release.outputs.value == 'true')
+        run: ${{ inputs.release_it_command }} ${{ inputs.release_it_args }} -VV --ci ${{ (github.ref_name == 'beta' && '--preRelease=beta') || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.release_token || github.token }}
           GIT_COMMITTER_NAME: ${{ steps.import_gpg.outputs.name || env.GIT_AUTHOR_NAME }}
@@ -126,7 +123,7 @@ jobs:
 
       - name: Get version
         id: version
-        if: steps.should_release.outputs.value == 'true'
+        if: (!inputs.check_if_should_release || steps.should_release.outputs.value == 'true')
         run: echo value=$(node -p "'v'+require('./package.json').version") >> $GITHUB_OUTPUT
 
       - name: Perform backmerge from main into beta
