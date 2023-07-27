@@ -1,0 +1,129 @@
+name: Build Android
+
+on:
+  workflow_call:
+    inputs:
+      after_install_command:
+        type: string
+      variant_staging:
+        type: string
+        description: "Variant to build, with first letter uppercased"
+      variant_prod:
+        type: string
+        description: "Variant to build, with first letter uppercased"
+      track_staging:
+        type: string
+        description: "Google Play track to upload staging variant"
+        default: internal
+      track_prod:
+        type: string
+        description: "Google Play track to upload production variant"
+        default: production
+      upload_apk:
+        type: boolean
+        default: true
+      upload_aab:
+        type: boolean
+        default: true
+      checkout_ref:
+        type: string
+      java_version:
+        type: number
+        default: 11
+    secrets:
+      checkout_token:
+      android_package_name:
+        description: Android package name on Google Play, one version must already exists before running this workflow
+        required: true
+      service_account_json:
+        description: The service account json private key file to authorize the upload request. Can be used instead of serviceAccountJsonPlainText to specify a file rather than provide a secret
+      service_account_json_plain_text:
+        description: The service account json in plain text, provided via a secret, etc
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    if: inputs.variant_staging || inputs.variant_prod
+
+    steps:
+      - name: Increase watchers to fix Docker
+        run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
+
+      - name: Checkout the repo
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+          token: ${{ secrets.checkout_token || github.token }}
+          ref: ${{ inputs.checkout_ref }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: microsoft
+          java-version: ${{ inputs.java_version }}
+          cache: gradle
+
+      - name: Make Gradle executable
+        run: chmod +x ./gradlew
+        working-directory: ./android
+
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: package.json
+          cache: yarn
+
+      - name: Install dependencies
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 5
+          max_attempts: 2
+          retry_on: error
+          command: yarn install --prefer-offline --frozen-lockfile --silent
+
+      - name: Get version
+        id: version
+        run: echo value=$(node -p "'v'+require('./package.json').version") >> $GITHUB_OUTPUT
+
+      - name: Check if version is prerelease
+        id: is_prerelease
+        run: echo value=$(node -p "!!require('semver/functions/prerelease')('${{ steps.version.outputs.value }}')") >> $GITHUB_OUTPUT
+
+      - name: Display version and prerelease
+        run: |
+          echo "Version: ${{ steps.version.outputs.value }}"
+          echo "Is Prerelease: ${{ fromJSON(steps.is_prerelease.outputs.value) }}"
+
+      - name: Run after install command
+        if: inputs.after_install_command
+        run: ${{ inputs.after_install_command }}
+
+      - name: Build AAB and APK for staging
+        if: inputs.variant_staging && steps.is_prerelease.outputs.value == 'true'
+        run: ./gradlew bundle${{ inputs.variant_staging }} assemble${{ inputs.variant_staging }} --no-daemon
+        working-directory: ./android
+
+      - name: Build AAB and APK for production
+        if: inputs.variant_prod && steps.is_prerelease.outputs.value == 'false'
+        run: ./gradlew bundle${{ inputs.variant_prod }} assemble${{ inputs.variant_prod }} --no-daemon
+        working-directory: ./android
+
+      - name: Upload APK to Release tagged with current version
+        uses: AButler/upload-release-assets@v2.0
+        if: inputs.upload_apk
+        with:
+          files: ./android/app/build/outputs/apk/**/*.apk
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          release-tag: ${{ steps.version.outputs.value }}
+
+      - name: Upload AAB to Google Play
+        uses: r0adkll/upload-google-play@v1
+        if: inputs.upload_aab
+        with:
+          packageName: ${{ secrets.android_package_name }}
+          releaseFiles: ./android/app/build/outputs/bundle/**/*.aab
+          serviceAccountJson: ${{ secrets.service_account_json }}
+          serviceAccountJsonPlainText: ${{ secrets.service_account_json_plain_text }}
+          track: ${{ (steps.is_prerelease.outputs.value == 'true' && inputs.track_staging) || inputs.track_prod }}
+          whatsNewDirectory: ./whatsnew
