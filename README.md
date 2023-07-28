@@ -44,6 +44,7 @@ jobs:
     name: Deploy
     uses: DiogoAbu/workflows/.github/workflows/reusable_beanstalk.yml@main
     needs: release
+    if: ${{ needs.release.outputs.should_release == 'true' }}
     with:
       files_to_zip: dist package.json
       should_deploy_prod: true
