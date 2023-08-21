@@ -19,15 +19,20 @@ on:
         type: string
         description: "Google Play track to upload production variant"
         default: production
+      release_status_staging:
+        type: string
+        description: "Google Play status for staging variant"
+        default: draft
+      release_status_prod:
+        type: string
+        description: "Google Play status for production variant"
+        default: completed
       upload_apk:
         type: boolean
         default: true
       upload_aab:
         type: boolean
         default: true
-      release_status:
-        type: string
-        default: completed
       checkout_ref:
         type: string
       java_version:
@@ -129,5 +134,5 @@ jobs:
           serviceAccountJson: ${{ secrets.service_account_json }}
           serviceAccountJsonPlainText: ${{ secrets.service_account_json_plain_text }}
           track: ${{ (steps.is_prerelease.outputs.value == 'true' && inputs.track_staging) || inputs.track_prod }}
-          status:
+          status: ${{ (steps.is_prerelease.outputs.value == 'true' && inputs.release_status_staging) || inputs.release_status_prod }}
           whatsNewDirectory: ./whatsnew
