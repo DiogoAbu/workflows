@@ -35,11 +35,15 @@ on:
         default: true
       checkout_ref:
         type: string
+      prev_version:
+        type: string
+        description: "Previous version to compare with current and detect version changes"
       java_version:
         type: number
         default: 11
     secrets:
       checkout_token:
+      after_install_command:
       android_package_name:
         description: Android package name on Google Play, one version must already exists before running this workflow
         required: true
@@ -47,6 +51,11 @@ on:
         description: The service account json private key file to authorize the upload request. Can be used instead of serviceAccountJsonPlainText to specify a file rather than provide a secret
       service_account_json_plain_text:
         description: The service account json in plain text, provided via a secret, etc
+      codepush_api_token:
+      codepush_app_name_android:
+        description: Specify app in the <ownerName>/<appName> format for Android
+      codepush_app_name_ios:
+        description: Specify app in the <ownerName>/<appName> format for iOS
 
 jobs:
   build:
@@ -98,28 +107,74 @@ jobs:
         id: is_prerelease
         run: echo value=$(node -p "!!require('semver/functions/prerelease')('${{ steps.version.outputs.value }}')") >> $GITHUB_OUTPUT
 
+      - name: Check if current version major is higher then previous version major
+        id: is_major_change
+        run: echo value=$(node -p "require('semver/functions/valid')('${{ inputs.prev_version }}') && require('semver/functions/major')('${{ steps.version.outputs.value }}') > require('semver/functions/major')('${{ inputs.prev_version }}')") >> $GITHUB_OUTPUT
+
       - name: Display version and prerelease
         run: |
           echo "Version: ${{ steps.version.outputs.value }}"
           echo "Is Prerelease: ${{ fromJSON(steps.is_prerelease.outputs.value) }}"
+          echo "Is Major Change: ${{ fromJSON(steps.is_major_change.outputs.value) }}"
 
-      - name: Run after install command
+      - name: Run after install command (secrets)
+        run: ${{ secrets.after_install_command }}
+
+      - name: Run after install command (inputs)
         if: inputs.after_install_command
         run: ${{ inputs.after_install_command }}
 
+      ##
+      ## No major change
+      ##
+      - name: Install AppCenter CLI
+        if: steps.is_major_change.outputs.value == 'false'
+        run: yarn global add appcenter-cli
+
+      - name: Build bundle with Codepush (Android)
+        if: steps.is_major_change.outputs.value == 'false'
+        run: |
+          [ -z "${{ secrets.codepush_app_name_android }}" ] && exit 0
+          appcenter \
+          codepush \
+          release-react \
+            --use-hermes \
+            --private-key-path codepush_code_signing_private.pem \
+            --app ${{ secrets.codepush_app_name_android }} \
+            --deployment-name ${{ (steps.is_prerelease.outputs.value == 'true' && 'Staging') || 'Production' }} \
+            --target-binary-version "^${{ steps.version.outputs.value }}" \
+            --token ${{ secrets.codepush_api_token }}
+
+      - name: Build bundle with Codepush (iOS)
+        if: steps.is_major_change.outputs.value == 'false'
+        run: |
+          [ -z "${{ secrets.codepush_app_name_ios }}" ] && exit 0
+          appcenter \
+          codepush \
+          release-react \
+            --use-hermes \
+            --private-key-path codepush_code_signing_private.pem \
+            --app ${{ secrets.codepush_app_name_ios }} \
+            --deployment-name ${{ (steps.is_prerelease.outputs.value == 'true' && 'Staging') || 'Production' }} \
+            --target-binary-version "^${{ steps.version.outputs.value }}" \
+            --token ${{ secrets.codepush_api_token }}
+
+      ##
+      ## Major change
+      ##
       - name: Build AAB and APK for staging
-        if: inputs.variant_staging && steps.is_prerelease.outputs.value == 'true'
+        if: inputs.variant_staging && steps.is_major_change.outputs.value == 'true' && steps.is_prerelease.outputs.value == 'true'
         run: ./gradlew bundle${{ inputs.variant_staging }} assemble${{ inputs.variant_staging }} --no-daemon
         working-directory: ./android
 
       - name: Build AAB and APK for production
-        if: inputs.variant_prod && steps.is_prerelease.outputs.value == 'false'
+        if: inputs.variant_prod && steps.is_major_change.outputs.value == 'true' && steps.is_prerelease.outputs.value == 'false'
         run: ./gradlew bundle${{ inputs.variant_prod }} assemble${{ inputs.variant_prod }} --no-daemon
         working-directory: ./android
 
       - name: Upload APK to Release tagged with current version
         uses: AButler/upload-release-assets@v2.0
-        if: inputs.upload_apk
+        if: inputs.upload_apk && steps.is_major_change.outputs.value == 'true'
         with:
           files: ./android/app/build/outputs/apk/**/*.apk
           repo-token: ${{ secrets.GITHUB_TOKEN }}
@@ -127,7 +182,7 @@ jobs:
 
       - name: Upload AAB to Google Play
         uses: r0adkll/upload-google-play@v1
-        if: inputs.upload_aab
+        if: inputs.upload_aab && steps.is_major_change.outputs.value == 'true'
         with:
           packageName: ${{ secrets.android_package_name }}
           releaseFiles: ./android/app/build/outputs/bundle/**/*.aab
