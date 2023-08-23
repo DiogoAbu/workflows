@@ -56,6 +56,7 @@ on:
         description: Specify app in the <ownerName>/<appName> format for Android
       codepush_app_name_ios:
         description: Specify app in the <ownerName>/<appName> format for iOS
+      codepush_private_key_path:
 
 jobs:
   build:
@@ -139,7 +140,7 @@ jobs:
           codepush \
           release-react \
             --use-hermes \
-            --private-key-path codepush_code_signing_private.pem \
+            --private-key-path ${{ secrets.codepush_private_key_path }} \
             --app ${{ secrets.codepush_app_name_android }} \
             --deployment-name ${{ (steps.is_prerelease.outputs.value == 'true' && 'Staging') || 'Production' }} \
             --target-binary-version "^${{ steps.version.outputs.value }}" \
@@ -153,7 +154,7 @@ jobs:
           codepush \
           release-react \
             --use-hermes \
-            --private-key-path codepush_code_signing_private.pem \
+            --private-key-path ${{ secrets.codepush_private_key_path }} \
             --app ${{ secrets.codepush_app_name_ios }} \
             --deployment-name ${{ (steps.is_prerelease.outputs.value == 'true' && 'Staging') || 'Production' }} \
             --target-binary-version "^${{ steps.version.outputs.value }}" \
