@@ -32,6 +32,8 @@ on:
         value: ${{ jobs.release_it.outputs.prev_version }}
       version:
         value: ${{ jobs.release_it.outputs.version }}
+      is_prerelease:
+        value: ${{ jobs.release_it.outputs.is_prerelease }}
 
 env:
   GIT_AUTHOR_NAME: github-actions[bot]
@@ -46,6 +48,7 @@ jobs:
       should_release: ${{ steps.should_release.outputs.value }}
       prev_version: ${{ steps.prev_version.outputs.value }}
       version: ${{ steps.version.outputs.value }}
+      is_prerelease: ${{ steps.is_prerelease.outputs.value }}
 
     steps:
       - name: Increase watchers to fix Docker
@@ -125,6 +128,11 @@ jobs:
         id: version
         if: (!inputs.check_if_should_release || steps.should_release.outputs.value == 'true')
         run: echo value=$(node -p "'v'+require('./package.json').version") >> $GITHUB_OUTPUT
+
+      - name: Get version
+        id: is_prerelease
+        if: (!inputs.check_if_should_release || steps.should_release.outputs.value == 'true')
+        run: echo value=$(node -p "!!require('semver/functions/prerelease')('${{ steps.version.outputs.value }}')") >> $GITHUB_OUTPUT
 
       - name: Perform backmerge from main into beta
         if: github.ref_name == 'main' && inputs.backmerge
