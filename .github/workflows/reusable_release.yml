@@ -34,6 +34,8 @@ on:
         value: ${{ jobs.release_it.outputs.version }}
       is_prerelease:
         value: ${{ jobs.release_it.outputs.is_prerelease }}
+      is_major_change:
+        value: ${{ jobs.release_it.outputs.is_major_change }}
 
 env:
   GIT_AUTHOR_NAME: github-actions[bot]
@@ -49,6 +51,7 @@ jobs:
       prev_version: ${{ steps.prev_version.outputs.value }}
       version: ${{ steps.version.outputs.value }}
       is_prerelease: ${{ steps.is_prerelease.outputs.value }}
+      is_major_change: ${{ steps.is_major_change.outputs.value }}
 
     steps:
       - name: Increase watchers to fix Docker
@@ -129,10 +132,15 @@ jobs:
         if: (!inputs.check_if_should_release || steps.should_release.outputs.value == 'true')
         run: echo value=$(node -p "'v'+require('./package.json').version") >> $GITHUB_OUTPUT
 
-      - name: Get version
+      - name: Check if version is prerelease
         id: is_prerelease
         if: (!inputs.check_if_should_release || steps.should_release.outputs.value == 'true')
         run: echo value=$(node -p "!!require('semver/functions/prerelease')('${{ steps.version.outputs.value }}')") >> $GITHUB_OUTPUT
+
+      - name: Check if current version major is higher then previous version major
+        id: is_major_change
+        if: (!inputs.check_if_should_release || steps.should_release.outputs.value == 'true')
+        run: echo value=$(node -p "require('semver/functions/valid')('${{ steps.prev_version.outputs.value }}') && require('semver/functions/major')('${{ steps.version.outputs.value }}') > require('semver/functions/major')('${{ steps.prev_version.outputs.value }}')") >> $GITHUB_OUTPUT
 
       - name: Perform backmerge from main into beta
         if: github.ref_name == 'main' && inputs.backmerge
