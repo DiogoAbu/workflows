@@ -43,20 +43,28 @@ on:
         default: 11
     secrets:
       checkout_token:
+        required: false
       after_install_command:
+        required: false
       android_package_name:
         description: Android package name on Google Play, one version must already exists before running this workflow
         required: true
       service_account_json:
-        description: The service account json private key file to authorize the upload request. Can be used instead of serviceAccountJsonPlainText to specify a file rather than provide a secret
+        description: The service account json private key file to authorize the upload request. Can be used instead of service_account_json_plain_text to specify a file rather than provide a secret. This is required if service_account_json_plain_text is not provided
+        required: false
       service_account_json_plain_text:
-        description: The service account json in plain text, provided via a secret, etc
+        description: The service account json in plain text, provided via a secret. This is required if service_account_json is not provided
+        required: false
       codepush_api_token:
+        required: false
       codepush_app_name_android:
         description: Specify app in the <ownerName>/<appName> format for Android
+        required: false
       codepush_app_name_ios:
         description: Specify app in the <ownerName>/<appName> format for iOS
+        required: false
       codepush_private_key_path:
+        required: false
 
 jobs:
   build:

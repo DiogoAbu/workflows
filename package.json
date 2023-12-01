@@ -5,11 +5,23 @@
   "author": "Diogo de Azevedo Silva <diogodeazevedosilva@gmail.com>",
   "license": "MIT",
   "type": "module",
+  "scripts": {
+    "validate-workflows": "node ./scripts/validate-workflows.js",
+    "prepare": "husky install"
+  },
   "devDependencies": {
+    "@action-validator/cli": "0.5.4",
+    "@action-validator/core": "0.5.4",
+    "@commitlint/cli": "^18.4.3",
+    "@commitlint/config-conventional": "^18.4.3",
     "@release-it/conventional-changelog": "^5.1.1",
-    "release-it": "^15.9.1"
+    "figures": "3.2.0",
+    "husky": "^8.0.0",
+    "release-it": "^15.9.1",
+    "signale-logger": "^1.5.1"
   },
   "volta": {
     "node": "18.15.0"
-  }
+  },
+  "dependencies": {}
 }
