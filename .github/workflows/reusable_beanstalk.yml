@@ -51,20 +51,20 @@ jobs:
         run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
 
       - name: Checkout the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           persist-credentials: false
           token: ${{ secrets.checkout_token || github.token }}
           ref: ${{ inputs.checkout_ref }}
 
       - name: Set up Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version-file: package.json
           cache: yarn
 
       - name: Install dependencies
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@v3
         with:
           timeout_minutes: 5
           max_attempts: 2
@@ -99,7 +99,7 @@ jobs:
           AWS_DEPLOY_ENVIRONMENT_NAME: ${{ (steps.is_prerelease.outputs.value == 'true' && secrets.environment_name_staging) || secrets.environment_name_prod }}
 
       - name: Beanstalk deploy
-        uses: einaregilsson/beanstalk-deploy@v21
+        uses: einaregilsson/beanstalk-deploy@v22
         if: (steps.is_prerelease.outputs.value == 'true' && inputs.should_deploy_staging) || inputs.should_deploy_prod
         with:
           deployment_package: ${{ runner.temp }}/deploy.zip
